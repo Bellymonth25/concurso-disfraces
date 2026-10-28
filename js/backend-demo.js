@@ -135,6 +135,14 @@ export function createDemoBackend() {
         for (const d of Object.keys(db.deviceLinks)) if (db.deviceLinks[d] === id) delete db.deviceLinks[d];
       });
     },
+    async deleteAllContestants() {
+      mutate((db) => {
+        db.contestants = [];
+        db.codes = {};
+        db.votes = [];
+        db.deviceLinks = {};
+      });
+    },
     async updateGame(patch) { mutate((db) => Object.assign(db.game, patch)); },
     async insertRound(round) {
       return mutate((db) => {

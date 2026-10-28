@@ -108,6 +108,7 @@ export function mountHost(root, ctx) {
           <h2>Zona peligrosa</h2>
           <div class="h-danger-row">
             <button class="btn btn-ghost" data-act="reset">↺ Reiniciar concurso (deja las fotos)</button>
+            <button class="btn btn-ghost" data-act="delete-all">🗑️ Borrar todos los concursantes</button>
             ${demo ? '<button class="btn btn-ghost" data-act="seed">🎭 Cargar 20 disfraces de prueba</button><button class="btn btn-ghost" data-act="wipe">🗑️ Borrar todo el demo</button>' : ''}
           </div>
         </section>
@@ -175,6 +176,16 @@ export function mountHost(root, ctx) {
     root.querySelector('[data-act=reset]').onclick = () => run(async () => {
       if (!confirm('¿Reiniciar el concurso? Se borran rondas y votos (los concursantes se quedan).')) return;
       await actions.reset();
+    });
+    // Para empezar un concurso con otra gente: reinicia y borra a todos (fotos y códigos incluidos)
+    root.querySelector('[data-act=delete-all]').onclick = () => run(async () => {
+      const n = ctx.state?.contestants.length || 0;
+      if (!n) { toast('No hay concursantes que borrar'); return; }
+      if (!confirm(`¿Borrar a los ${n} concursantes con sus fotos y códigos?\n\nTambién se reinicia el concurso (rondas y votos). No se puede deshacer.`)) return;
+      await actions.reset();
+      await backend.deleteAllContestants();
+      codes = {};
+      toast('Listo, concurso vacío ✅', 'ok');
     });
     root.querySelector('[data-act=logout]')?.addEventListener('click', async () => { await backend.signOut(); renderLogin(); });
     root.querySelector('[data-act=seed]')?.addEventListener('click', () => run(() => backend.seedFake(20)));

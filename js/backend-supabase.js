@@ -152,6 +152,13 @@ export async function createSupabaseBackend(url, key) {
       const path = row.photo_url?.split('/photos/')[1];
       if (path) await sb.storage.from('photos').remove([path]);
     },
+    // Borra a todos los concursantes y sus fotos (sus códigos y votos se van en cascada)
+    async deleteAllContestants() {
+      const rows = check(await sb.from('contestants').select('photo_url'));
+      check(await sb.from('contestants').delete().not('id', 'is', null));
+      const paths = rows.map((r) => r.photo_url?.split('/photos/')[1]).filter(Boolean);
+      for (let i = 0; i < paths.length; i += 100) await sb.storage.from('photos').remove(paths.slice(i, i + 100));
+    },
     async updateGame(patch) { check(await sb.from('game').update(fromGame(patch)).eq('id', 1)); },
     async insertRound(round) {
       const data = check(await sb.from('rounds').insert(fromRound({ status: 'ready', ...round })).select('*').single());

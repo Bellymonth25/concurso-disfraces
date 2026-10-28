@@ -112,6 +112,10 @@ Si llegan menos personas que el primer corte, el sistema se salta a la ronda que
 
 **Volver a empezar (para pruebas):** al terminar, el panel muestra **↺ Nuevo concurso**. También está en Zona peligrosa → *Reiniciar concurso*. Se borran rondas y votos y regresa a "Registro", pero los disfraces se quedan.
 
+**Concurso nuevo con otra gente:** Zona peligrosa → **🗑️ Borrar todos los concursantes**. Reinicia el concurso y borra a todos los concursantes, con sus fotos y códigos. No se puede deshacer. Si algún celular sigue mostrando el nombre de alguien del concurso anterior, se toca el nombre y se elige *Cambiar*.
+
+> Hay **un solo concurso a la vez**. Para dos concursos simultáneos: crea otro proyecto de Supabase, corre ahí el mismo SQL y haz otra copia del repo cambiando solo `js/config.js`.
+
 **Reglas:**
 - **Empate en el corte:** pasan todos los empatados. La TV dice, por ejemplo, "¡Pasan 27…!" aunque el corte fuera 25.
 - **Si la línea de corte cae en 0 votos:** pasan solo los que tienen votos.
