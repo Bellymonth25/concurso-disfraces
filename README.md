@@ -72,7 +72,7 @@ Para cambiar algo después (título, colores…), edita el archivo en GitHub y P
 ## 4. El día de la fiesta 🎃
 
 **Durante la llegada o el desfile:**
-1. El host abre `/#host`. Por cada disfraz: 📷 **Tomar foto**, escribe el nombre y dale **Agregar**.
+1. El host abre `/#host`. Por cada disfraz: **📷 Tomar foto** con la cámara, o **🖼️ Subir foto** si alguien la mandó antes (galería del celular o archivos de la compu; en la compu también se puede arrastrar al recuadro). Se abre un **editor para encuadrar**: arrastra para mover, pellizca o usa la barra para acercar. *Foto completa* deja ver toda la foto y rellena los lados con la misma foto desenfocada, útil para fotos horizontales o de grupo. Luego escribe el nombre y dale **Agregar**. La foto se guarda en 960×1280 (3:4), el formato de todas las tarjetas.
 2. Aparece un **código grande y un QR personal**. La persona lo escanea con su celular, o escribe el código, y queda ligada a su disfraz: así **no puede votar por sí misma**.
 3. La TV (`/#tv`) va mostrando a todos los que se registran.
 
@@ -152,6 +152,7 @@ js/view-voter.js      vista de invitados
 js/view-tv.js         vista de la TV
 js/reveal.js          animación de eliminación y ganador
 js/view-host.js       panel del host
+js/cropper.js         editor para encuadrar la foto
 js/logic.js           reglas: rondas, votos, empates, desempate
 js/backend-supabase.js  conexión a Supabase
 js/backend-demo.js      modo demo (sin servidor)

@@ -368,7 +368,28 @@ input:disabled { opacity: .5; }
 .h-photo-pick { cursor: pointer; flex: none; }
 .h-photo-preview { width: 110px; aspect-ratio: 3 / 4; border: 2px dashed var(--line); border-radius: 12px; display: grid; place-items: center; text-align: center; color: var(--muted); overflow: hidden; font-size: 14px; }
 .h-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
-.h-add-fields { flex: 1; display: grid; gap: 10px; align-content: start; }
+.h-add-fields { flex: 1; display: grid; gap: 10px; align-content: start; min-width: 0; }
+/* Editor para encuadrar la foto */
+.crop-modal { width: min(94vw, 420px); }
+.crop-frame { position: relative; width: min(78vw, 320px); aspect-ratio: 3 / 4; margin: 4px auto 0; overflow: hidden; border-radius: 16px;
+  border: 2px solid var(--orange); background: #111; touch-action: none; cursor: grab; user-select: none; }
+.crop-frame:active { cursor: grabbing; }
+.crop-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(.55); transform: scale(1.1); pointer-events: none; }
+.crop-img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; transform-origin: 0 0; }
+.crop-guides { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent 33.2%, #fff3 33.3%, #fff3 33.6%, transparent 33.7%, transparent 66.3%, #fff3 66.4%, #fff3 66.7%, transparent 66.8%),
+              linear-gradient(180deg, transparent 33.2%, #fff3 33.3%, #fff3 33.6%, transparent 33.7%, transparent 66.3%, #fff3 66.4%, #fff3 66.7%, transparent 66.8%); }
+.crop-help { color: var(--muted); font-size: 13px; margin: 10px 0 4px; }
+.crop-zoom { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+.crop-zoom input { flex: 1; accent-color: var(--orange); padding: 0; border: 0; background: none; }
+.crop-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.crop-quick .btn { padding: 8px; font-size: 13px; }
+.crop-modal .pmodal-actions { margin-top: 14px; }
+
+.h-photo-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.h-photo-btns .btn { padding: 9px 8px; font-size: 14px; }
+.h-photo-preview { cursor: pointer; transition: border-color .2s, background .2s; }
+.h-photo-preview:hover, .h-photo-preview.drag { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 10%, transparent); }
 .h-list { display: grid; gap: 8px; max-height: 520px; overflow: auto; }
 .h-item { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 6px; border-radius: 10px; background: var(--bg2); }
 .h-item .photo { width: 44px; border-radius: 8px; }

@@ -1,12 +1,14 @@
 // Panel del host: registrar disfraces, configurar rondas y manejar la votación.
 
 import { EVENT_TITLE } from './config.js';
-import { $, esc, fmtTime, qrSvg, resizeImage, store, toast } from './util.js';
+import { $, esc, fmtTime, qrSvg, store, toast } from './util.js';
+import { cropPhoto } from './cropper.js';
 import { currentRound, defaultVotesPlan, effectiveStatus, hostActions, parseCuts, computeQualifiers, showcaseIds } from './logic.js';
 import { byId, photoHtml, roundLabel } from './components.js';
 import { THEMES, themeOf } from './themes.js';
 
-const TIMERS = [[0, 'Sin límite'], [30, '30 s'], [60, '1 min'], [90, '1:30'], [120, '2 min'], [180, '3 min'], [300, '5 min']];
+const EMPTY_PREVIEW = '<span>📷<br>Sin foto</span>';
+const TIMERS =[[0, 'Sin límite'], [30, '30 s'], [60, '1 min'], [90, '1:30'], [120, '2 min'], [180, '3 min'], [300, '5 min']];
 
 export function mountHost(root, ctx) {
   const { backend } = ctx;
@@ -79,13 +81,18 @@ export function mountHost(root, ctx) {
           <section class="h-card">
             <h2>Concursantes <span class="h-count"></span></h2>
             <form class="h-add">
-              <label class="h-photo-pick">
-                <input type="file" accept="image/*" capture="environment" hidden>
-                <div class="h-photo-preview"><span>📷<br>Tomar foto</span></div>
-              </label>
+              <div class="h-photo-pick">
+                <div class="h-photo-preview" title="También puedes arrastrar una foto aquí">${EMPTY_PREVIEW}</div>
+                <input class="in-camera" type="file" accept="image/*" capture="environment" hidden>
+                <input class="in-file" type="file" accept="image/*" hidden>
+              </div>
               <div class="h-add-fields">
                 <input name="name" placeholder="Nombre o disfraz (ej. Ana – Bruja)" maxlength="40" required autocomplete="off">
-                <button class="btn btn-primary">Agregar al concurso</button>
+                <div class="h-photo-btns">
+                  <button type="button" class="btn btn-ghost" data-pick="camera">📷 Tomar foto</button>
+                  <button type="button" class="btn btn-ghost" data-pick="file">🖼️ Subir foto</button>
+                </div>
+                <button type="submit" class="btn btn-primary">Agregar al concurso</button>
               </div>
             </form>
             <div class="h-list"></div>
@@ -116,16 +123,36 @@ export function mountHost(root, ctx) {
       <dialog class="h-modal"></dialog>`;
 
     // ---- Foto + nombre ----
+    // Dos formas de elegir la foto: la cámara, o un archivo (galería del celular / carpeta de la compu).
+    // En la compu también se puede arrastrar la foto al recuadro.
     let photoBlob = null;
-    const fileIn = $('.h-photo-pick input', root);
+    const camIn = $('.in-camera', root);
+    const fileIn = $('.in-file', root);
     const preview = $('.h-photo-preview', root);
-    fileIn.onchange = async () => {
-      const f = fileIn.files[0];
+    const usePhoto = async (f) => {
       if (!f) return;
+      if (!f.type.startsWith('image/')) { toast('Ese archivo no es una imagen', 'error'); return; }
       try {
-        photoBlob = await resizeImage(f, backend.mode === 'demo' ? 420 : 800, backend.mode === 'demo' ? 0.7 : 0.82);
+        // El host encuadra la foto en 3:4 (el formato de todas las tarjetas) antes de subirla
+        const blob = await cropPhoto(f, backend.mode === 'demo' ? { outW: 420, quality: 0.7 } : { outW: 960, quality: 0.85 });
+        if (!blob) return; // canceló
+        photoBlob = blob;
         preview.innerHTML = `<img src="${URL.createObjectURL(photoBlob)}" alt="">`;
-      } catch { toast('No se pudo leer la foto', 'error'); }
+      } catch { toast('No se pudo leer la foto. Prueba con JPG o PNG.', 'error'); }
+      camIn.value = '';
+      fileIn.value = '';
+    };
+    camIn.onchange = () => usePhoto(camIn.files[0]);
+    fileIn.onchange = () => usePhoto(fileIn.files[0]);
+    root.querySelector('[data-pick=camera]').onclick = () => camIn.click();
+    root.querySelector('[data-pick=file]').onclick = () => fileIn.click();
+    preview.onclick = () => fileIn.click();
+    preview.ondragover = (e) => { e.preventDefault(); preview.classList.add('drag'); };
+    preview.ondragleave = () => preview.classList.remove('drag');
+    preview.ondrop = (e) => {
+      e.preventDefault();
+      preview.classList.remove('drag');
+      usePhoto(e.dataTransfer.files[0]);
     };
     $('.h-add', root).onsubmit = async (e) => {
       e.preventDefault();
@@ -133,7 +160,7 @@ export function mountHost(root, ctx) {
       const name = nameIn.value.trim();
       if (!name) return;
       if (!photoBlob && !confirm('¿Agregar sin foto?')) return;
-      const btn = e.target.querySelector('button');
+      const btn = e.target.querySelector('button[type=submit]');
       btn.disabled = true;
       btn.textContent = 'Subiendo…';
       try {
@@ -142,8 +169,9 @@ export function mountHost(root, ctx) {
         showCode(name, code);
         nameIn.value = '';
         photoBlob = null;
+        camIn.value = '';
         fileIn.value = '';
-        preview.innerHTML = '<span>📷<br>Tomar foto</span>';
+        preview.innerHTML = EMPTY_PREVIEW;
         ctx.refresh();
       } catch (err) { toast(err.message, 'error'); }
       btn.disabled = false;
