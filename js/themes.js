@@ -1,0 +1,81 @@
+// Temas visuales. Los colores y adornos viven en css/styles.css ([data-theme=…]);
+// aquí van los textos y emojis que cambian con cada tema.
+
+export const THEMES = {
+  clasico: {
+    name: 'Halloween clásico',
+    desc: 'Calabazas, murciélagos y niebla',
+    emoji: '🎃',
+    swatch: ['#0d0714', '#ff7a18', '#8b5cf6'],
+    welcome: '🎃',
+    waiting: '🦇',
+    emptyTitle: '¡Que empiece el desfile!',
+    emptySub: 'Pasa con el host para tu foto y entra al concurso',
+    danger: '¿Quién se va? 💀',
+    stamp: 'ELIMINADO',
+    saved: '¡Se salvaron! 🎉',
+    passTo: (n, next) => `¡Pasan ${n} a ${next}! 🎉`,
+    timesUp: '⏰ ¡SE ACABÓ EL TIEMPO!',
+    outTitle: 'Quedaste eliminado',
+    outEmoji: '💀',
+    passTitle: '¡PASASTE!',
+    outCount: 'Eliminados',
+    showcaseTitle: 'Desfile de disfraces',
+    spotlight: 'Desfilando',
+    path: 'El camino al trono',
+    showIcon: '🎃',
+  },
+  zombie: {
+    name: 'Apocalipsis zombie',
+    desc: 'Zona infectada, cinta de precaución y sangre',
+    emoji: '☣️',
+    swatch: ['#0b0b09', '#b3121b', '#9be22d'],
+    welcome: '🧟',
+    waiting: '☣️',
+    emptyTitle: '¡Sobrevivientes, repórtense!',
+    emptySub: 'Pasa al punto de control para tu foto de identificación',
+    danger: '¿Quién se infecta? ☣️',
+    stamp: 'INFECTADO',
+    saved: '¡Sobrevivieron! 🩸',
+    passTo: (n, next) => `¡${n} sobrevivientes pasan a ${next}!`,
+    timesUp: '🚨 ¡SE ACABÓ EL TIEMPO!',
+    outTitle: 'Te infectaron 🧟',
+    outEmoji: '🧟',
+    passTitle: '¡SOBREVIVISTE!',
+    outCount: 'Infectados',
+    showcaseTitle: 'Desfile de sobrevivientes',
+    spotlight: 'Sobreviviente',
+    path: 'Cómo sobrevivió',
+    showIcon: '🧟',
+  },
+  muertos: {
+    name: 'Noche de Muertos',
+    desc: 'Papel picado, cempasúchil y calaveritas',
+    emoji: '💀',
+    swatch: ['#1c0730', '#ff9f1c', '#e4007c'],
+    welcome: '💀',
+    waiting: '🕯️',
+    emptyTitle: '¡Que empiece el desfile!',
+    emptySub: 'Pasa con el host para tu foto y entra al concurso',
+    danger: '¿Quién cruza al más allá? 🕯️',
+    stamp: 'AL MÁS ALLÁ',
+    saved: '¡Siguen de este lado! 🌼',
+    passTo: (n, next) => `¡Pasan ${n} a ${next}! 🌼`,
+    timesUp: '🕯️ ¡SE ACABÓ EL TIEMPO!',
+    outTitle: 'Cruzaste al más allá',
+    outEmoji: '🕯️',
+    passTitle: '¡PASASTE!',
+    outCount: 'Al más allá',
+    showcaseTitle: 'Desfile de catrines',
+    spotlight: 'Desfilando',
+    path: 'El camino al trono',
+    showIcon: '💀',
+  },
+};
+
+export const themeOf = (state) => THEMES[state?.game?.theme] || THEMES.clasico;
+
+export function applyTheme(id) {
+  const t = THEMES[id] ? id : 'clasico';
+  if (document.documentElement.dataset.theme !== t) document.documentElement.dataset.theme = t;
+}
