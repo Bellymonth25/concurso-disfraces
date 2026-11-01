@@ -142,7 +142,8 @@ Los celulares siguen los mismos pasos: muestran el 3er lugar, el ganador, el pod
 - **Empate en el corte:** pasan todos los empatados. La TV dice, por ejemplo, "¡Pasan 27…!" aunque el corte fuera 25.
 - **Si la línea de corte cae en 0 votos:** pasan solo los que tienen votos.
 - **Empate por el 1er lugar en la final:** la TV muestra **¡EMPATE!** con los empatados chocando, y el host tiene el botón **⚔️ Iniciar desempate**. Es una ronda solo con ellos y 1 voto por persona. Si vuelven a empatar, se repite. Al resolverse, sigue la premiación normal.
-- **Empate por el 2º o 3er lugar:** gana quien sumó **más votos en todo el concurso**. Si aun así siguen empatados, comparten lugar.
+- **Empate por el 2º o 3er lugar:** gana quien sumó **más votos en todo el concurso**. Si aun así siguen empatados, comparten lugar, y el podio no se salta lugares: con dos 2º, el siguiente es 3º.
+- **Al revelar la final** solo se quedan en pantalla los que van al podio. Si alguien llegó a la final pero quedó 4º o más abajo, aparece en la lista de "los demás".
 - **Lugares de los demás:** primero los eliminados en la final, luego los de la Ronda 2 y luego los de la Ronda 1, cada grupo ordenado por sus votos en esa ronda.
 
 **Trucos:**

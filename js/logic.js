@@ -106,6 +106,34 @@ export function eliminatedIn(state) {
 const shortLabel = (r) => (r.isTiebreak ? 'Desempate' : r.stage >= FINAL ? 'Final' : `Ronda ${r.stage + 1}`);
 const longLabel = (r) => (r.isTiebreak ? 'Desempate' : r.stage >= FINAL ? 'Gran Final' : `Ronda ${r.stage + 1}`);
 
+// ---------- Podio ----------
+// Reglas: empate por el 1er lugar (en votos de la final) → ronda de desempate.
+// Empates por el 2º o 3º → gana quien sumó más votos en todo el concurso; si siguen iguales, comparten lugar.
+// Los lugares del podio no se saltan: con dos 2º, el siguiente es 3º.
+
+const cmpKey = (a, b) => (a[0] !== b[0] ? b[0] - a[0] : b[1] - a[1]);
+
+// Agrupa por [votos en la final, votos totales] de mayor a menor (cada grupo = un lugar)
+function groupsByKey(ids, fv, total) {
+  const sorted = [...ids].sort((a, b) => cmpKey([fv(a), total(a)], [fv(b), total(b)]));
+  const groups = [];
+  for (const id of sorted) {
+    const last = groups[groups.length - 1];
+    if (last && fv(last[0]) === fv(id) && total(last[0]) === total(id)) last.push(id);
+    else groups.push([id]);
+  }
+  return groups;
+}
+
+// Quiénes se quedan en pantalla al revelar la final: los empatados por el 1º y quien complete el podio
+export function pickPodium(ids, fv, total) {
+  const top = Math.max(...ids.map(fv));
+  const first = ids.filter((id) => fv(id) === top);
+  const groups = groupsByKey(ids.filter((id) => !first.includes(id)), fv, total);
+  const room = first.length > 1 ? 1 : 2; // lugares que quedan (2º y 3º, o solo 3º si el 1º va a desempate)
+  return [...first, ...groups.slice(0, room).flat()];
+}
+
 // Resultados finales: podio (con desempate si hubo), estadísticas por ronda y lugares del resto.
 // getTally(round) → { contestantId: votos } (el público solo puede leerlo de rondas ya reveladas).
 export async function computeResults(state, getTally) {
@@ -114,29 +142,47 @@ export async function computeResults(state, getTally) {
   if (!final) return null;
   const tallies = {};
   for (const r of revealed) tallies[r.id] = await getTally(r);
-
-  const fv = tallies[final.id] || {};
-  const finalists = [...final.qualifiedIds].sort((a, b) => (fv[b] || 0) - (fv[a] || 0));
-  const places = placesOf(finalists, fv);
-  // Desempates por el 1er lugar (el último manda)
-  // (si el desempate volvió a empatar, los que siguen empatados quedan como 1º compartido)
-  for (const tb of revealed.filter((r) => r.isTiebreak && r.id > final.id)) {
-    for (const id of tb.candidateIds) places[id] = tb.qualifiedIds.includes(id) ? 1 : 2;
-  }
-  // 2º y 3º: si empatan en votos de la final, desempata quien sumó más votos en todo el concurso
+  const fvMap = tallies[final.id] || {};
+  const fv = (id) => fvMap[id] || 0;
   const total = (id) => revealed.filter((r) => !r.isTiebreak).reduce((a, r) => a + ((tallies[r.id] || {})[id] || 0), 0);
-  const key = (id) => [places[id] === 1 ? 1 : 0, fv[id] || 0, total(id)];
-  const better = (a, b) => { const x = key(a), y = key(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
-  for (const id of finalists) if (places[id] !== 1) places[id] = 1 + finalists.filter((o) => better(o, id)).length;
-  finalists.sort((a, b) => places[a] - places[b] || (fv[b] || 0) - (fv[a] || 0));
-  const firstTie = finalists.filter((id) => places[id] === 1).length > 1;
-  const winners = finalists.filter((id) => places[id] === 1);
-  const seconds = finalists.filter((id) => places[id] === 2);
-  const thirds = finalists.filter((id) => places[id] >= 3);
 
-  // El resto: primero los eliminados en la final, luego los de la Ronda 2, luego los de la Ronda 1
+  // 1er lugar: los más votados en la final; si hubo desempate, manda el último
+  const ids = final.qualifiedIds;
+  const top = Math.max(...ids.map(fv));
+  const tiedFirst = ids.filter((id) => fv(id) === top);
+  const tbs = revealed.filter((r) => r.isTiebreak && r.id > final.id);
+  const lastTb = tbs[tbs.length - 1];
+  const winners = lastTb ? lastTb.qualifiedIds.filter((id) => ids.includes(id)) : tiedFirst;
+  const firstTie = winners.length > 1;
+  const places = Object.fromEntries(winners.map((id) => [id, 1]));
+  // Los que perdieron un desempate por el 1º siguen en orden (votos del desempate y luego totales)
+  const tbLosers = tiedFirst.filter((id) => !winners.includes(id));
+  let nextPlace = 2;
+  if (lastTb && tbLosers.length) {
+    const tbv = (id) => (tallies[lastTb.id] || {})[id] || 0;
+    for (const g of groupsByKey(tbLosers, tbv, total)) {
+      for (const id of g) places[id] = nextPlace;
+      nextPlace++;
+    }
+  }
+  // El resto, por grupos (votos de la final y luego votos totales), sin saltar lugares
+  for (const g of groupsByKey(ids.filter((id) => !(id in places)), fv, total)) {
+    for (const id of g) places[id] = nextPlace;
+    nextPlace++;
+  }
+  const byPlace = (a, b) => places[a] - places[b] || fv(b) - fv(a) || total(b) - total(a);
+  const finalists = ids.filter((id) => places[id] <= PODIUM).sort(byPlace);
+  const seconds = finalists.filter((id) => places[id] === 2);
+  const thirds = finalists.filter((id) => places[id] === 3);
+
+  // El resto: primero quien llegó a la final pero no al podio, luego los eliminados en la final,
+  // luego los de la Ronda 2 y luego los de la Ronda 1
   const others = [];
   let next = finalists.length + 1;
+  const extra = ids.filter((id) => places[id] > PODIUM).sort(byPlace);
+  const pe = placesOf(extra, Object.fromEntries(extra.map((id) => [id, places[id] * -1])));
+  for (const id of extra) others.push({ id, place: next + pe[id] - 1, votes: fv(id), round: 'Gran Final' });
+  next += extra.length;
   for (const r of revealed.filter((x) => !x.isTiebreak).reverse()) {
     const t = tallies[r.id] || {};
     const out = r.candidateIds.filter((id) => !r.qualifiedIds.includes(id)).sort((a, b) => (t[b] || 0) - (t[a] || 0));
@@ -145,7 +191,7 @@ export async function computeResults(state, getTally) {
     next += out.length;
   }
 
-  // Lugar y votos de cada finalista en cada ronda que jugó
+  // Lugar y votos de cada uno del podio en cada ronda que jugó
   const history = Object.fromEntries(finalists.map((id) => [id, []]));
   for (const r of revealed) {
     const t = tallies[r.id] || {};
@@ -234,7 +280,15 @@ export function hostActions(backend, getState, getNow) {
       const r = currentRound(getState());
       if (!r) return;
       const tally = await backend.adminTally(r.id);
-      const { qualified } = computeQualifiers(r.candidateIds, tally, r.cut);
+      let { qualified } = computeQualifiers(r.candidateIds, tally, r.cut);
+      if (r.stage >= FINAL && !r.isTiebreak) {
+        // En la final se queda en pantalla solo el podio (los empates por 2º/3º se rompen con votos totales)
+        const { rounds } = getState();
+        const prev = rounds.filter((x) => x.status === 'revealed' && !x.isTiebreak);
+        const totals = {};
+        for (const pr of prev) for (const [id, v] of Object.entries(await backend.adminTally(pr.id))) totals[id] = (totals[id] || 0) + v;
+        qualified = pickPodium(r.candidateIds, (id) => tally[id] || 0, (id) => (totals[id] || 0) + (tally[id] || 0));
+      }
       await backend.updateRound(r.id, { status: 'revealed', qualifiedIds: qualified });
       if (r.stage >= FINAL) {
         // ¿Quedó empate por el 1er lugar? Entonces toca desempate antes del podio

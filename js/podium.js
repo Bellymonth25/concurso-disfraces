@@ -26,6 +26,7 @@ const card = (c, cls = '', extra = '') =>
   `<div class="fcard ${cls}">${photoHtml(c)}<div class="fcard-name">${esc(c?.name || '¿?')}</div>${extra}</div>`;
 
 const finalVotes = (results, id) => results.history[id]?.find((h) => h.short === 'Final')?.votes ?? 0;
+const votesTxt = (n, tail = '') => `<b>${n}</b> voto${n === 1 ? '' : 's'}${tail}`;
 
 export async function renderFinalStep(stage, { step, results, cmap, theme, animate }) {
   const anim = animate && !reduced();
@@ -42,7 +43,7 @@ export async function renderFinalStep(stage, { step, results, cmap, theme, anima
     const tied = results.winners;
     say('¡EMPATE!', 'tie-title');
     body.innerHTML = `
-      <div class="fin-tie">${tied.map((id, i) => `${i ? '<div class="fin-vs">⚔️</div>' : ''}${card(c(id), 'tied', `<div class="fcard-votes"><b>${finalVotes(results, id)}</b> votos</div>`)}`).join('')}</div>
+      <div class="fin-tie">${tied.map((id, i) => `${i ? '<div class="fin-vs">⚔️</div>' : ''}${card(c(id), 'tied', `<div class="fcard-votes">${votesTxt(finalVotes(results, id))}</div>`)}`).join('')}</div>
       <div class="fin-sub">Empate por el 1er lugar · ¡Se va a <b>desempate</b>!</div>`;
     if (anim) burst(fx, 'embers', 2500);
     return;
@@ -61,10 +62,10 @@ export async function renderFinalStep(stage, { step, results, cmap, theme, anima
 
   // ---- 1: 3er lugar ----
   if (step === 1) {
-    say(results.thirds.length ? '🥉 Tercer lugar' : contenders.length > 2 ? '¡Empate por el 2º lugar!' : '¡Solo quedan dos!', 'bronze');
+    say(results.thirds.length > 1 ? '🥉 ¡Empate en el 3er lugar!' : results.thirds.length ? '🥉 Tercer lugar' : contenders.length > 2 ? '¡Empate por el 2º lugar!' : '¡Solo quedan dos!', 'bronze');
     body.innerHTML = `
       <div class="fin-third">
-        <div class="fin-third-main">${results.thirds.map((id) => card(c(id), 'big bronze', `<div class="fcard-medal">🥉</div><div class="fcard-votes"><b>${finalVotes(results, id)}</b> votos en la final</div>`)).join('')}</div>
+        <div class="fin-third-main">${results.thirds.map((id) => card(c(id), 'big bronze', `<div class="fcard-medal">🥉</div><div class="fcard-votes">${votesTxt(finalVotes(results, id), ' en la final')}</div>`)).join('')}</div>
         <div class="fin-third-side">
           <div class="fin-side-title">¿Quién ganará?</div>
           ${shuffle(contenders).map((id) => card(c(id), 'small mystery')).join('')}
