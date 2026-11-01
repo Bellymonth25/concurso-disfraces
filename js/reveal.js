@@ -2,7 +2,7 @@
 //   cuenta regresiva → todos aparecen en orden AL AZAR (sin votos ni lugar)
 //   → los eliminados van cayendo uno por uno, también al azar
 //   → los que se salvan se acomodan por lugar y se revelan votos + medallas 🥇🥈🥉
-//   → (final) el ganador al centro con confeti, y luego "su camino" ronda por ronda.
+//   → en la final se detiene con los 3 finalistas (sin revelar su orden); el podio vive en podium.js.
 
 import { esc, fitGrid, sleep } from './util.js';
 import { photoHtml } from './components.js';
@@ -20,7 +20,7 @@ function shuffle(arr) {
   return a;
 }
 
-export async function playReveal(stage, { round, tally, cmap, finalWinner, tie, nextLabel, theme = THEMES.clasico, history = null, animate = true }) {
+export async function playReveal(stage, { round, tally, cmap, finalists = false, tie = false, nextLabel, theme = THEMES.clasico, animate = true }) {
   const ranked = [...round.candidateIds].sort((a, b) => (tally[b] || 0) - (tally[a] || 0));
   // Lugar "de competencia": empatados comparten lugar (1, 2, 2, 4…)
   const place = Object.fromEntries(ranked.map((id) => [id, 1 + ranked.filter((x) => (tally[x] || 0) > (tally[id] || 0)).length]));
@@ -77,15 +77,18 @@ export async function playReveal(stage, { round, tally, cmap, finalWinner, tie, 
   };
 
   const showFinal = () => {
-    survivors.forEach((id) => {
+    // En la final los finalistas siguen "anónimos": su lugar se revela después, paso a paso
+    const order = finalists ? shuffle(survivors) : survivors;
+    order.forEach((id) => {
       const el = cards[id];
-      el.classList.remove('anon', 'safe');
+      el.classList.remove('safe');
       el.classList.add('shown', 'pass');
-      if (!finalWinner && place[id] <= 3) el.classList.add(`medal-${place[id]}`);
+      if (finalists) { el.classList.add('finalist'); return; }
+      el.classList.remove('anon');
+      if (place[id] <= 3) el.classList.add(`medal-${place[id]}`);
     });
-    layout(survivors, finalWinner ? 0.75 : 0.72);
-    if (finalWinner) cards[finalWinner].classList.add('champion');
-    banner.innerHTML = bannerHtml({ finalWinner, tie, nextLabel, count: survivors.length, cmap, theme });
+    layout(order, finalists ? 0.75 : 0.72);
+    banner.innerHTML = bannerHtml({ finalists, tie, nextLabel, count: survivors.length, theme });
     banner.classList.add('show');
   };
 
@@ -97,7 +100,6 @@ export async function playReveal(stage, { round, tally, cmap, finalWinner, tie, 
     showFinal();
     void field.offsetWidth;
     requestAnimationFrame(() => { field.classList.remove('no-trans'); stage.classList.remove('no-trans'); });
-    if (finalWinner) await showStats(true);
     return;
   }
 
@@ -173,98 +175,26 @@ export async function playReveal(stage, { round, tally, cmap, finalWinner, tie, 
 
   // 4. Los que se salvaron: brillan, luego se acomodan por lugar y se revelan votos y medallas
   survivors.forEach((id) => cards[id].classList.add('safe'));
-  banner.innerHTML = `<div class="rv-title">${esc(finalWinner ? '' : theme.saved)}</div>`;
-  if (!finalWinner) banner.classList.add('show');
+  banner.innerHTML = finalists
+    ? `<div class="rv-title gold">${esc(theme.finalists)}</div>`
+    : `<div class="rv-title">${esc(theme.saved)}</div>`;
+  banner.classList.add('show');
   await sleep(1400);
   banner.classList.remove('show');
   showFinal();
   survivors.forEach((id, i) => { cards[id].style.transitionDelay = `${Math.min(i * 40, 600)}ms`; });
   setTimeout(() => survivors.forEach((id) => { cards[id].style.transitionDelay = ''; }), 2000);
-  burst(fx, finalWinner ? 'confetti' : 'embers', finalWinner ? 9000 : 3500);
-
-  // 5. El ganador se hace a un lado y aparece "su camino" ronda por ronda
-  if (finalWinner) {
-    await sleep(4500);
-    await showStats(false);
-  }
-
-  async function showStats(instant) {
-    const hist = await Promise.resolve(history).catch(() => null);
-    if (!hist?.length || !stage.isConnected) return;
-    const rv = stage.querySelector('.rv');
-    if (!rv || !rv.contains(field)) return; // la TV ya cambió de pantalla
-    if (instant) field.classList.add('no-trans');
-    rv.classList.add('with-stats');
-    layout([finalWinner], 0.75);
-    rv.insertAdjacentHTML('beforeend', statsHtml(hist, cmap[finalWinner], theme));
-    const panel = rv.querySelector('.rv-stats');
-    if (instant) {
-      panel.classList.add('instant');
-      void field.offsetWidth;
-      field.classList.remove('no-trans');
-    }
-    requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('show')));
-  }
+  burst(fx, 'embers', 3500);
 }
 
-// Panel de estadísticas del ganador: gráfica de su lugar en cada ronda + tabla
-function statsHtml(hist, winner, theme) {
-  const W = 600, H = 280, L = 56, R = 34, T = 34, B = 46;
-  const n = hist.length;
-  const maxPlace = Math.max(2, ...hist.map((h) => h.place));
-  const x = (i) => (n === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (n - 1));
-  const y = (p) => T + ((p - 1) / (maxPlace - 1)) * (H - T - B);
-  const pts = hist.map((h, i) => [x(i), y(h.place)]);
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-  const area = `${line} L${pts[n - 1][0].toFixed(1)},${H - B} L${pts[0][0].toFixed(1)},${H - B} Z`;
-  const ticks = [...new Set([1, Math.ceil(maxPlace / 2), maxPlace])];
-  const dur = 1.8;
-  const totalVotes = hist.reduce((a, h) => a + h.votes, 0);
-  const medal = (p) => (p <= 3 ? ['🥇', '🥈', '🥉'][p - 1] : '');
-
-  return `
-    <div class="rv-stats">
-      <div class="rs-kicker">${esc(theme.path)}</div>
-      <div class="rs-name">${esc(winner?.name || '')}</div>
-      <svg class="rs-chart" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lugar en cada ronda">
-        <defs>
-          <linearGradient id="rsFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" style="stop-color:var(--gold);stop-opacity:.35"/>
-            <stop offset="1" style="stop-color:var(--gold);stop-opacity:0"/>
-          </linearGradient>
-        </defs>
-        ${ticks.map((p) => `<line class="rs-grid" x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}"/><text class="rs-axis" x="${L - 12}" y="${y(p) + 5}" text-anchor="end">#${p}</text>`).join('')}
-        ${hist.map((h, i) => `<text class="rs-axis" x="${x(i)}" y="${H - 14}" text-anchor="middle">${esc(h.short)}</text>`).join('')}
-        <path class="rs-area" d="${area}" fill="url(#rsFill)"/>
-        <path class="rs-line" d="${line}" pathLength="1" style="--dur:${dur}s"/>
-        ${pts.map((p, i) => `
-          <g class="rs-pt" style="--d:${((i / Math.max(1, n - 1)) * dur).toFixed(2)}s">
-            <circle cx="${p[0]}" cy="${p[1]}" r="${i === n - 1 ? 11 : 8}"/>
-            <text x="${p[0]}" y="${p[1] - 18}" text-anchor="middle">#${hist[i].place}</text>
-          </g>`).join('')}
-      </svg>
-      <div class="rs-rows">
-        ${hist.map((h, i) => `
-          <div class="rs-row" style="--d:${(dur + 0.15 * i).toFixed(2)}s">
-            <span class="rs-round">${esc(h.label)}</span>
-            <span class="rs-place">${medal(h.place)} <b>#${h.place}</b> de ${h.of}</span>
-            <span class="rs-votes"><b>${h.votes}</b> voto${h.votes === 1 ? '' : 's'}</span>
-          </div>`).join('')}
-        <div class="rs-row rs-total" style="--d:${(dur + 0.15 * n).toFixed(2)}s">
-          <span class="rs-round">Total</span><span></span><span class="rs-votes"><b>${totalVotes}</b> votos</span>
-        </div>
-      </div>
-    </div>`;
-}
-
-function bannerHtml({ finalWinner, tie, nextLabel, count, cmap, theme }) {
-  if (finalWinner) return `<div class="rv-title gold">👑 ¡${esc(cmap[finalWinner]?.name || 'Ganador')} GANA! 👑</div>`;
-  if (tie) return '<div class="rv-title">¡EMPATE! ⚔️ Se va a desempate</div>';
+function bannerHtml({ finalists, tie, nextLabel, count, theme }) {
+  if (finalists && tie) return '<div class="rv-title">¡Empate por el 1er lugar! ⚔️ Va a desempate</div>';
+  if (finalists) return `<div class="rv-title gold">${esc(theme.finalists)}</div>`;
   return `<div class="rv-title">${esc(theme.passTo(count, nextLabel))}</div>`;
 }
 
 // Partículas: brasas o confeti (los colores salen del tema)
-function burst(canvas, kind, duration) {
+export function burst(canvas, kind, duration) {
   const ctx = canvas.getContext('2d');
   const dpr = Math.min(2, devicePixelRatio || 1);
   canvas.width = canvas.clientWidth * dpr;

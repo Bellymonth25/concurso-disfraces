@@ -5,25 +5,29 @@ Una sola página con tres vistas:
 | Link | Para quién | Qué hace |
 |---|---|---|
 | `https://TU-USUARIO.github.io/TU-REPO/` | Invitados (el QR apunta aquí) | Entrar como concursante (con código) o como votante, y votar |
-| `…/#tv` | La pantalla o TV | QR, barras grises en vivo, "¡se acabó el tiempo!", animación de eliminados y ganador |
+| `…/#tv` | La pantalla o TV | QR, barras grises en vivo, "¡se acabó el tiempo!", animación de eliminados y premiación con podio |
 | `…/#host` | El host | Tomar fotos, ver códigos, configurar rondas, abrir y cerrar votaciones, revelar |
 
 Hosting: **GitHub Pages** (gratis). Backend: **Supabase** (gratis), que guarda base de datos, fotos y tiempo real.
 
 ---
 
-## 0. Probarlo ya (modo demo, sin instalar nada)
+## 0. Practicar en modo demo (sin tocar los datos reales)
 
-Si `js/config.js` no tiene datos de Supabase, la página corre en **modo demo**: todo se guarda en tu navegador y las pestañas se sincronizan entre sí.
+Agrega **`?demo`** a la dirección, antes del `#`:
 
-1. Sirve la carpeta con cualquier servidor local, por ejemplo `python -m http.server 5180`, y abre `http://localhost:5180/#host`.
-2. Zona peligrosa → **Cargar 20 disfraces de prueba**.
-3. Abre **📺 Abrir TV** en otra pestaña.
-4. En el host: Comenzar concurso → Abrir votación → **🤖 Simular 40 votantes** → Cerrar → **✨ Revelar**.
+| Vista | Dirección |
+|---|---|
+| Host | `https://TU-USUARIO.github.io/TU-REPO/?demo#host` |
+| TV | `https://TU-USUARIO.github.io/TU-REPO/?demo#tv` |
+
+- No pide contraseña y **no toca Supabase**: todo se guarda en ese navegador.
+- Las pestañas de ese navegador se sincronizan entre sí, así que puedes tener el host en una y la TV en otra.
+- En *Zona peligrosa* están **🎭 Cargar 20 disfraces de prueba** y **🗑️ Borrar todo el demo**. Durante la votación, el botón **🤖 Simular 40 votantes** genera votos falsos.
+- ⚠️ Los celulares **no** se pueden conectar al demo, porque vive solo en ese navegador. Para probar con celulares, usa la dirección normal.
+- También funciona en local (`python -m http.server 5180` → `http://localhost:5180/?demo#host`), o con `js/config.js` vacío.
 
 > Abrir `index.html` con doble clic no funciona; los módulos de JavaScript necesitan un servidor, aunque sea local.
-
----
 
 ## 1. Crear el backend en Supabase (~10 min)
 
@@ -76,15 +80,20 @@ Para cambiar algo después (título, colores…), edita el archivo en GitHub y P
 2. Aparece un **código grande y un QR personal**. La persona lo escanea con su celular, o escribe el código, y queda ligada a su disfraz: así **no puede votar por sí misma**.
 3. La TV (`/#tv`) va mostrando a todos los que se registran.
 
-**Rondas:** en el panel → *Rondas* escribe cuántos pasan, por ejemplo `25, 10, 5, 1`. Los votos por persona se calculan solos (3, 2, 2, 1) y se pueden ajustar.
+**Rondas:** siempre son **3**: **Ronda 1**, **Ronda 2** y la **Gran Final** (premiación con podio de 3).
 
-| Rondas | Votos por persona |
-|---|---|
-| 3 | 3, 2, 1 |
-| 4 | 3, 2, 2, 1 |
-| 5 | 3, 3, 2, 2, 1 |
+| Ronda | Pasan | Votos por persona |
+|---|---|---|
+| Ronda 1 | los que diga el host (20 por defecto) | los que diga el host (3 por defecto) |
+| Ronda 2 | los que diga el host (6 por defecto) | los que diga el host (2 por defecto) |
+| Gran Final y desempate | podio de 3 | **siempre 1** |
 
-Si llegan menos personas que el primer corte, el sistema se salta a la ronda que tenga sentido.
+- Los valores por defecto se cambian en el panel → *Rondas*, antes de empezar.
+- **Durante el concurso**, en la Ronda 1 y la Ronda 2 aparecen dos campos:
+  - **"Pasan [ N ] de M"**: se puede cambiar hasta antes de revelar.
+  - **"Votos por persona [ V ]"**: se puede cambiar hasta antes de **abrir la votación**. Después queda fijo, para que nadie vote con reglas distintas.
+- La página no deja escribir letras, negativos ni decimales. Tampoco deja que pasen menos de 3 (para que haya podio) o más de los que hay. Los votos van de 1 a 10, y nunca más que los disfraces que hay menos uno.
+- Con 3 concursantes o menos se va directo a la final.
 
 **Cada ronda:**
 1. **Abrir votación**, eligiendo tiempo (30 s, 1 min… o sin límite). Los celulares muestran los disfraces que siguen en concurso. Si alguien quiere enviar menos votos de los que tiene, la página le avisa cuántos le faltan antes de enviar. Una vez enviado, **el voto ya no se puede cambiar**.
@@ -96,8 +105,21 @@ Si llegan menos personas que el primer corte, el sistema se salta a la ronda que
    - Los eliminados se van marcando uno por uno, en orden aleatorio y a ritmo constante: la foto **se pone en gris** y el borde, el brillo y el sello toman el **color del tema**, para que se distingan bien. Clásico: rojo, ELIMINADO. Zombie: verde tóxico, INFECTADO. Muertos: rosa mexicano, AL MÁS ALLÁ. Se **quedan en su lugar**. Arriba a la derecha, un contador marca cuántos van (por ejemplo "INFECTADOS 4 / 12").
    - Cuando ya están todos marcados, **caen a la vez**, cada uno con su propio retraso, giro y dirección al azar.
    - Los que se salvaron se acomodan por lugar, con votos y medallas 🥇🥈🥉 para los 3 primeros.
-   - En la final, el ganador queda con corona y confeti. Luego se hace a un lado y aparece **su camino**: una gráfica de su lugar en cada ronda y una tabla con lugar y votos por ronda.
 5. **Siguiente ronda →**, o antes **Presentar (desfile)**.
+
+**La Gran Final (premiación):** el revelar elimina a todos menos a los **3 finalistas**, que se quedan en pantalla sin decir en qué lugar quedó cada uno. Después **el host avanza cada paso** con un botón, cuando quiera:
+1. **🥉 Revelar 3er lugar**: sale en grande, y los otros dos quedan a un lado con "¿Quién ganará?".
+2. **🏆 Revelar al ganador**: los dos que quedan "trepan" hacia la cima en una carrera pareja, hasta que uno llega arriba con corona 👑 y confeti.
+3. **📊 Mostrar podio y estadísticas**:
+   - A la izquierda, el **podio** con 1º, 2º y 3º y, abajo, la lista de **cómo quedaron los demás** (4º, 5º, 6º…).
+   - A la derecha, una **gráfica con el lugar de los 3 finalistas en cada ronda** y una tabla con sus votos.
+
+La carrera final cambia con el tema:
+- 🎃 **Clásico:** quién llega a la cima 🏔️
+- 🧟 **Zombie:** "¡Solo hay lugar para uno en el helicóptero!" 🚁, y el ganador "¡SE SALVA!"
+- 💀 **Muertos:** quién llega primero al altar 🕯️
+
+Los celulares siguen los mismos pasos: muestran el 3er lugar, el ganador, el podio y el lugar de cada quien.
 
 **Modo desfile** (🎃 / 🧟 / 💀 según el tema): el botón *Presentar* está en Registro, antes de abrir la votación y después de revelar.
 - La TV muestra a todos los que siguen en concurso.
@@ -119,8 +141,9 @@ Si llegan menos personas que el primer corte, el sistema se salta a la ronda que
 **Reglas:**
 - **Empate en el corte:** pasan todos los empatados. La TV dice, por ejemplo, "¡Pasan 27…!" aunque el corte fuera 25.
 - **Si la línea de corte cae en 0 votos:** pasan solo los que tienen votos.
-- **Empate en la final:** aparece el botón **⚔️ Ronda de desempate**, solo con los empatados y 1 voto por persona.
-- **Ganador:** pantalla con corona 👑 y confeti.
+- **Empate por el 1er lugar en la final:** la TV muestra **¡EMPATE!** con los empatados chocando, y el host tiene el botón **⚔️ Iniciar desempate**. Es una ronda solo con ellos y 1 voto por persona. Si vuelven a empatar, se repite. Al resolverse, sigue la premiación normal.
+- **Empate por el 2º o 3er lugar:** gana quien sumó **más votos en todo el concurso**. Si aun así siguen empatados, comparten lugar.
+- **Lugares de los demás:** primero los eliminados en la final, luego los de la Ronda 2 y luego los de la Ronda 1, cada grupo ordenado por sus votos en esa ronda.
 
 **Trucos:**
 - **👀 Ver conteo real (spoiler)** en el panel muestra los votos con nombres solo al host.
@@ -150,11 +173,13 @@ js/config.js          ← aquí van los datos de Supabase
 js/app.js             arranque y rutas (/, #tv, #host)
 js/view-voter.js      vista de invitados
 js/view-tv.js         vista de la TV
-js/reveal.js          animación de eliminación y ganador
+js/reveal.js          animación de eliminación
+js/podium.js          premiación de la final: empate, 3er lugar, duelo, podio
 js/view-host.js       panel del host
 js/cropper.js         editor para encuadrar la foto
-js/logic.js           reglas: rondas, votos, empates, desempate
+js/logic.js           reglas: 3 rondas, "pasan N", empates, desempate y resultados
 js/backend-supabase.js  conexión a Supabase
 js/backend-demo.js      modo demo (sin servidor)
 supabase/schema.sql   tablas, seguridad y funciones (pegar en Supabase)
+supabase/actualizacion-podio.sql   solo si ya habías corrido schema.sql antes del podio
 ```

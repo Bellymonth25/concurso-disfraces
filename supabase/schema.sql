@@ -16,8 +16,8 @@ create table if not exists public.admins (
 create table if not exists public.game (
   id int primary key default 1 check (id = 1),
   phase text not null default 'setup' check (phase in ('setup', 'running', 'finished')),
-  cuts int[] not null default '{25,10,5,1}',
-  votes_plan int[] not null default '{3,2,2,1}',
+  cuts int[] not null default '{20,6,3}',          -- pasan en Ronda 1, Ronda 2, podio
+  votes_plan int[] not null default '{3,2,1}',
   current_round_id bigint,
   winner_ids uuid[] not null default '{}',
   theme text not null default 'clasico',
@@ -27,6 +27,8 @@ alter table public.game add column if not exists theme text not null default 'cl
 -- Modo desfile: la TV muestra a los concursantes y el host pone a uno en pantalla completa
 alter table public.game add column if not exists showcase boolean not null default false;
 alter table public.game add column if not exists spotlight_id uuid;
+-- Premiación de la final, paso a paso: -1 empate · 0 finalistas · 1 3er lugar · 2 ganador · 3 podio
+alter table public.game add column if not exists final_step int not null default 0;
 insert into public.game (id) values (1) on conflict (id) do nothing;
 
 create table if not exists public.contestants (
@@ -223,7 +225,7 @@ returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_admin() then raise exception 'Solo el host'; end if;
-  update game set phase = 'setup', current_round_id = null, winner_ids = '{}', showcase = false, spotlight_id = null, updated_at = now() where id = 1;
+  update game set phase = 'setup', current_round_id = null, winner_ids = '{}', showcase = false, spotlight_id = null, final_step = 0, updated_at = now() where id = 1;
   delete from votes where true;
   delete from rounds where true;
 end;

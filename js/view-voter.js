@@ -2,7 +2,7 @@
 
 import { EVENT_TITLE, EVENT_SUBTITLE } from './config.js';
 import { $, esc, store, deviceId, fmtTime, toast } from './util.js';
-import { currentRound, effectiveStatus } from './logic.js';
+import { computeResults, currentRound, effectiveStatus, isFinalRound } from './logic.js';
 import { themeOf } from './themes.js';
 import { byId, candidateCard, mountHiddenChart, photoHtml, roundLabel, showModal } from './components.js';
 
@@ -40,7 +40,10 @@ export function mountVoter(root, ctx) {
       if (!c) { toast('Ese código no existe 🤔', 'error'); return false; }
       identity = { kind: 'contestant', id: c.id, name: c.name };
       store.set(ID_KEY, identity);
-      history.replaceState(null, '', location.pathname + location.hash);
+      // Quita solo ?code= de la dirección (deja ?demo si está)
+      const q = new URLSearchParams(location.search);
+      q.delete('code');
+      history.replaceState(null, '', location.pathname + (q.toString() ? `?${q}` : '') + location.hash);
       toast(`¡Hola, ${c.name}! 👻`);
       render(true);
       return true;
@@ -120,7 +123,8 @@ export function mountVoter(root, ctx) {
     if (round?.id !== selRound) { selection = new Set(); selRound = round?.id; }
 
     const theme = themeOf(state);
-    const key = [game.phase, round?.id, status, !!voted, contestants.length, round?.candidateIds.length, me, game.theme,
+    const key = [game.phase, round?.id, status, !!voted, contestants.length, round?.candidateIds.length, me, game.theme, round?.cut, round?.votesPerVoter,
+      isFinalRound(round) && status === 'revealed' ? `step:${game.finalStep ?? 0}` : '',
       game.showcase ? `show:${game.spotlightId || ''}` : ''].join('|');
     if (!force && key === lastKey) {
       updateChart?.(ctx.tally, round?.cut);
@@ -160,16 +164,8 @@ export function mountVoter(root, ctx) {
     const cands = round.candidateIds.map((id) => cmap[id]).filter(Boolean);
     const label = roundLabel(round, game);
 
-    if (game.phase === 'finished') {
-      const winners = game.winnerIds.map((id) => cmap[id]).filter(Boolean);
-      const iWon = me && game.winnerIds.includes(me);
-      main.innerHTML = `
-        <section class="v-card center winner-card">
-          <div class="big-emoji">👑</div>
-          <h2>${iWon ? '¡GANASTE! 🎉' : '¡Tenemos ganador!'}</h2>
-          ${winners.map((w) => `<div class="v-winner">${photoHtml(w)}<span>${esc(w.name)}</span></div>`).join('')}
-          <p>Gracias por votar 🎃</p>
-        </section>`;
+    if (isFinalRound(round) && status === 'revealed') {
+      renderFinal(state, round, cmap, me, theme);
       return;
     }
 
@@ -178,7 +174,7 @@ export function mountVoter(root, ctx) {
         <section class="v-card center">
           <div class="v-round">${esc(label)}</div>
           <h2>Está por comenzar…</h2>
-          <p>${cands.length} disfraces · pasan <b>${round.cut}</b> · tendrás <b>${round.votesPerVoter}</b> voto${round.votesPerVoter > 1 ? 's' : ''}</p>
+          <p>${cands.length} disfraces · ${isFinalRound(round) ? (round.isTiebreak ? '<b>desempate por el 1er lugar</b>' : '<b>podio de 3</b>') : `pasan <b>${round.cut}</b>`} · tendrás <b>${round.votesPerVoter}</b> voto${round.votesPerVoter > 1 ? 's' : ''}</p>
         </section>
         <div class="v-grid">${cands.map((c) => candidateCard(c, { self: c.id === me })).join('')}</div>`;
       return;
@@ -253,9 +249,66 @@ export function mountVoter(root, ctx) {
             <h2>${passed ? theme.passTitle : theme.outTitle}</h2>
             <p>${passed ? 'Sigues en el concurso' : 'Pero aún puedes votar en las siguientes rondas'}</p>
           </section>` : ''}
-        <h3 class="v-section">${q.length > 1 && round.stage >= game.cuts.length - 1 ? '¡Empate! Van a desempate' : `Pasan ${q.length}`}</h3>
+        <h3 class="v-section">Pasan ${q.length}</h3>
         <div class="v-grid">${q.map((c) => candidateCard(c, { self: c.id === me, extra: medal(c.id) })).join('')}</div>`;
     }
+  }
+
+  // Gran Final en el celular: sigue los mismos pasos que la TV
+  let finalToken = 0;
+  async function renderFinal(state, round, cmap, me, theme) {
+    const token = ++finalToken;
+    main.innerHTML = '<section class="v-card center"><div class="big-emoji float">🏆</div><h2>Gran Final</h2><p>Mira la pantalla…</p></section>';
+    let results;
+    try {
+      results = await computeResults(state, async (r) => {
+        const rows = r.id === round.id ? ctx.tally : await ctx.backend.fetchTally(r.id);
+        return Object.fromEntries(rows.filter((x) => x.id).map((x) => [x.id, x.votes]));
+      });
+    } catch { return; }
+    if (token !== finalToken || !results) return;
+    const step = state.game.finalStep ?? 0;
+    const c = (id) => cmap[id];
+    const grid = (ids, medal) => `<div class="v-grid">${ids.map((id) => c(id) && candidateCard(c(id), { self: id === me, extra: medal ? `<span class="ccard-medal">${medal(id)}</span>` : '' })).join('')}</div>`;
+    const MED = (id) => ({ 1: '🥇', 2: '🥈', 3: '🥉' }[Math.min(3, results.places[id])]);
+    const isFinalist = me && results.finalists.includes(me);
+    const myOther = me && results.others.find((o) => o.id === me);
+
+    if (step === -1) {
+      main.innerHTML = `
+        <section class="v-card center"><div class="big-emoji shake">⚔️</div><h2>¡EMPATE!</h2><p>Empate por el 1er lugar. ¡Se viene un desempate!</p></section>
+        ${grid(results.winners)}`;
+      return;
+    }
+    if (step === 0) {
+      main.innerHTML = `
+        <section class="v-card center ${isFinalist ? 'pass' : ''}"><div class="big-emoji">🏆</div>
+          <h2>${isFinalist ? '¡Estás en el podio!' : 'Los finalistas'}</h2><p>¿Quién se llevará el 1er lugar? Mira la pantalla…</p></section>
+        ${grid(results.finalists)}`;
+      return;
+    }
+    if (step === 1) {
+      const iAm3 = me && results.thirds.includes(me);
+      main.innerHTML = `
+        <section class="v-card center ${iAm3 ? 'pass' : ''}"><div class="big-emoji">🥉</div>
+          <h2>${iAm3 ? '¡Quedaste en 3er lugar!' : 'Tercer lugar'}</h2></section>
+        ${grid(results.thirds, () => '🥉')}
+        <h3 class="v-section">¿Quién ganará?</h3>
+        ${grid([...results.winners, ...results.seconds])}`;
+      return;
+    }
+    // Pasos 2 y 3: ya hay ganador
+    const myPlace = isFinalist ? results.places[me] : myOther?.place;
+    main.innerHTML = `
+      <section class="v-card center winner-card"><div class="big-emoji">👑</div>
+        <h2>${me && results.winners.includes(me) ? '¡GANASTE! 🎉' : '¡Tenemos ganador!'}</h2>
+        ${results.winners.map((id) => c(id) ? `<div class="v-winner">${photoHtml(c(id))}<span>${esc(c(id).name)}</span></div>` : '').join('')}
+        ${myPlace ? `<p>Tu lugar: <b>${myPlace}º</b></p>` : '<p>Gracias por votar 🎃</p>'}
+      </section>
+      <h3 class="v-section">Podio</h3>
+      ${grid(results.finalists, MED)}
+      ${results.others.length ? `<h3 class="v-section">Los demás</h3>
+        <div class="v-others">${results.others.map((o) => `<div class="v-other ${o.id === me ? 'me' : ''}"><b>${o.place}º</b><span>${esc(c(o.id)?.name || '¿?')}</span></div>`).join('')}</div>` : ''}`;
   }
 
   function updateStats(round) {

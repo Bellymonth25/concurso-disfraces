@@ -74,6 +74,6 @@ export function showModal({ icon = '', title, html = '', actions = [{ label: 'Ok
 export function roundLabel(round, game) {
   if (!round) return '';
   if (round.isTiebreak) return 'Desempate';
-  if (round.cut === 1 || round.stage === game.cuts.length - 1) return 'Gran Final';
-  return `Ronda ${round.number}`;
+  if (round.stage >= 2) return 'Gran Final';
+  return `Ronda ${round.stage + 1}`;
 }

@@ -1,10 +1,11 @@
 // Pantalla grande (TV / proyector)
 
 import { EVENT_TITLE, EVENT_SUBTITLE } from './config.js';
-import { $, esc, fitGrid, fmtTime, qrSvg } from './util.js';
-import { currentRound, effectiveStatus, showcaseIds } from './logic.js';
+import { $, esc, fitGrid, fmtTime, qrSvg, sleep } from './util.js';
+import { computeResults, currentRound, effectiveStatus, isFinalRound, showcaseIds } from './logic.js';
 import { byId, mountHiddenChart, photoHtml, roundLabel } from './components.js';
 import { playReveal } from './reveal.js';
+import { renderFinalStep } from './podium.js';
 import { themeOf } from './themes.js';
 
 const BAT = '<svg viewBox="0 0 64 32"><path d="M32 10c-2-4-5-6-5-6s1 4 0 6c-5-3-12-3-17-1 4 1 7 4 7 7-4-2-9-1-12 1 7 0 12 4 14 9 3-3 7-4 13-3 6-1 10 0 13 3 2-5 7-9 14-9-3-2-8-3-12-1 0-3 3-6 7-7-5-2-12-2-17 1-1-2 0-6 0-6s-3 2-5 6z" fill="currentColor"/></svg>';
@@ -69,15 +70,19 @@ export function mountTv(root, ctx) {
     const now = ctx.now();
     const status = effectiveStatus(round, now);
 
-    roundEl.innerHTML = round
-      ? `<span class="pill">${esc(roundLabel(round, game))}</span><span class="tv-round-sub">${round.candidateIds.length} disfraces · pasan ${round.cut}</span>`
+    const awarding = isFinalRound(round) && status === 'revealed' && (game.finalStep ?? 0) >= 0;
+    roundEl.innerHTML = awarding
+      ? '<span class="pill">Gran Final</span><span class="tv-round-sub">Premiación</span>'
+      : round
+      ? `<span class="pill">${esc(roundLabel(round, game))}</span><span class="tv-round-sub">${round.candidateIds.length} disfraces · ${isFinalRound(round) ? (round.isTiebreak ? 'por el 1er lugar' : 'podio de 3') : `pasan ${round.cut}`}</span>`
       : `<span class="pill">Registro</span><span class="tv-round-sub">${contestants.length} disfraces</span>`;
     statsEl.innerHTML = round && status !== 'ready'
       ? `<div><b>${round.voterCount}</b> votantes</div><div><b>${round.voteCount}</b> votos</div>`
       : '';
 
     const theme = themeOf(state);
-    const key = [game.phase === 'setup' ? 'setup' : 'run', round?.id, status, contestants.length, game.theme,
+    const key = [game.phase === 'setup' ? 'setup' : 'run', round?.id, status, contestants.length, game.theme, round?.cut, round?.votesPerVoter,
+      isFinalRound(round) && status === 'revealed' ? `step:${game.finalStep ?? 0}` : '',
       game.showcase ? `show:${game.spotlightId || ''}` : ''].join('|');
     // Una animación en curso solo se interrumpe si el host entra al modo desfile
     if (busy && !game.showcase) return;
@@ -104,7 +109,7 @@ export function mountTv(root, ctx) {
           <div class="splash-text">
             <div class="splash-kicker">Prepárense…</div>
             <div class="splash-title">${esc(roundLabel(round, game))}</div>
-            <div class="splash-sub">${cands.length} disfraces · pasan <b>${round.cut}</b> · <b>${round.votesPerVoter}</b> voto${round.votesPerVoter > 1 ? 's' : ''} por persona</div>
+            <div class="splash-sub">${cands.length} disfraces · ${isFinalRound(round) ? (round.isTiebreak ? '<b>por el 1er lugar</b>' : '<b>podio de 3</b>') : `pasan <b>${round.cut}</b>`} · <b>${round.votesPerVoter}</b> voto${round.votesPerVoter > 1 ? 's' : ''} por persona</div>
           </div>
         </div>`;
       renderMarquee(cands);
@@ -126,44 +131,45 @@ export function mountTv(root, ctx) {
 
     if (status === 'revealed') {
       renderMarquee([]);
-      const tally = Object.fromEntries(ctx.tally.filter((r) => r.id).map((r) => [r.id, r.votes]));
-      const q = round.qualifiedIds;
-      const last = game.cuts.length - 1;
-      let next = round.stage + 1;
-      while (next < last && game.cuts[next] >= q.length) next++;
-      const animate = !!prev && prev !== 'revealed';
-      busy = animate;
       side.classList.add('mini');
-      const finalWinner = q.length === 1 ? q[0] : null;
+      const tally = Object.fromEntries(ctx.tally.filter((r) => r.id).map((r) => [r.id, r.votes]));
+      const animate = !!prev && prev !== 'revealed';
+      if (isFinalRound(round)) { renderFinal(state, round, tally, cmap, theme, animate); return; }
+      const q = round.qualifiedIds;
+      busy = animate;
       playReveal(stage, {
-        round, tally, cmap, theme, finalWinner,
-        history: finalWinner ? winnerHistory(state, finalWinner) : null,
-        tie: q.length > 1 && round.stage >= last,
-        nextLabel: next >= last ? 'la Gran Final' : `la Ronda ${round.number + 1}`,
-        animate,
+        round, tally, cmap, theme, animate,
+        nextLabel: round.stage === 0 && q.length > 3 ? 'la Ronda 2' : 'la Gran Final',
       }).finally(() => { busy = false; });
-      return;
     }
   }
 
-  // Lugar y votos del ganador en cada ronda que jugó (para la gráfica final)
-  async function winnerHistory(state, wid) {
-    const last = state.game.cuts.length - 1;
-    const rounds = state.rounds.filter((r) => r.status === 'revealed' && r.candidateIds.includes(wid)).sort((a, b) => a.id - b.id);
-    const out = [];
-    for (const r of rounds) {
-      const rows = r.id === state.game.currentRoundId ? ctx.tally : await ctx.backend.fetchTally(r.id);
-      const t = Object.fromEntries(rows.filter((x) => x.id).map((x) => [x.id, x.votes]));
-      const v = t[wid] || 0;
-      out.push({
-        label: roundLabel(r, state.game),
-        short: r.isTiebreak ? 'Desempate' : r.stage >= last ? 'Final' : `Ronda ${r.number}`,
-        place: 1 + r.candidateIds.filter((id) => (t[id] || 0) > v).length,
-        of: r.candidateIds.length,
-        votes: v,
+  // Gran Final: (si se acaba de revelar) eliminación hasta los finalistas, luego el paso de premiación actual
+  let lastStep = null;
+  async function renderFinal(state, round, tally, cmap, theme, justRevealed) {
+    const step = state.game.finalStep ?? 0;
+    const stepChanged = lastStep !== null && lastStep !== step;
+    lastStep = step;
+    busy = true;
+    try {
+      const results = await computeResults(state, async (r) => {
+        if (r.id === round.id) return tally;
+        const rows = await ctx.backend.fetchTally(r.id);
+        return Object.fromEntries(rows.filter((x) => x.id).map((x) => [x.id, x.votes]));
       });
+      if (!results) return;
+      if (justRevealed && !round.isTiebreak) {
+        await playReveal(stage, { round, tally, cmap, theme, finalists: true, tie: step === -1, animate: true });
+        await sleep(2600);
+      }
+      await renderFinalStep(stage, { step, results, cmap, theme, animate: justRevealed || stepChanged });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      busy = false;
+      // Si el host avanzó mientras corría la animación, ponernos al día
+      if ((ctx.state.game.finalStep ?? 0) !== step) render(true);
     }
-    return out;
   }
 
   // Modo desfile: cuadrícula de los que siguen y, si el host elige a alguien, pantalla completa

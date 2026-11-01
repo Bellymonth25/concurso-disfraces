@@ -41,11 +41,12 @@ const toGame = (g) => ({
   theme: g.theme || 'clasico',
   showcase: !!g.showcase,
   spotlightId: g.spotlight_id || null,
+  finalStep: g.final_step ?? 0,
 });
 const fromGame = (p) => {
   const map = {
     phase: 'phase', cuts: 'cuts', votesPlan: 'votes_plan', currentRoundId: 'current_round_id', winnerIds: 'winner_ids',
-    theme: 'theme', showcase: 'showcase', spotlightId: 'spotlight_id',
+    theme: 'theme', showcase: 'showcase', spotlightId: 'spotlight_id', finalStep: 'final_step',
   };
   const out = { updated_at: new Date().toISOString() };
   for (const [k, v] of Object.entries(p)) if (map[k]) out[map[k]] = v;

@@ -12,6 +12,10 @@ import { mountVoter } from './view-voter.js';
 import { mountTv } from './view-tv.js';
 import { mountHost } from './view-host.js';
 
+// Agregar ?demo a la dirección fuerza el modo demo aunque haya Supabase configurado
+// (para practicar sin tocar los datos reales; todo vive en ese navegador).
+const FORCE_DEMO = new URLSearchParams(location.search).has('demo');
+
 const listeners = new Set();
 const ctx = {
   backend: null,
@@ -21,11 +25,11 @@ const ctx = {
   now: () => Date.now() + ctx.offset,
   subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   refresh: null,
-  voterUrl: location.origin + location.pathname,
+  voterUrl: location.origin + location.pathname + (FORCE_DEMO ? '?demo' : ''),
 };
 
 async function boot() {
-  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && !FORCE_DEMO) {
     const { createSupabaseBackend } = await import('./backend-supabase.js');
     ctx.backend = await createSupabaseBackend(SUPABASE_URL, SUPABASE_ANON_KEY);
   } else {

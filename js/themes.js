@@ -24,6 +24,10 @@ export const THEMES = {
     spotlight: 'Desfilando',
     path: 'El camino al trono',
     showIcon: '🎃',
+    finalists: '🏆 ¡Estos son los finalistas! 🏆',
+    duelTitle: '¿Quién llegará a la cima? 🏔️',
+    duelGoal: '🏔️',
+    duelWin: (n) => `👑 ¡${n} GANA! 👑`,
   },
   zombie: {
     name: 'Apocalipsis zombie',
@@ -47,6 +51,10 @@ export const THEMES = {
     spotlight: 'Sobreviviente',
     path: 'Cómo sobrevivió',
     showIcon: '🧟',
+    finalists: '☣️ ¡Los últimos sobrevivientes! ☣️',
+    duelTitle: '🚁 ¡Solo hay lugar para uno en el helicóptero!',
+    duelGoal: '🚁',
+    duelWin: (n) => `🚁 ¡${n} SE SALVA! 🚁`,
   },
   muertos: {
     name: 'Noche de Muertos',
@@ -70,6 +78,10 @@ export const THEMES = {
     spotlight: 'Desfilando',
     path: 'El camino al trono',
     showIcon: '💀',
+    finalists: '🌼 ¡Estos son los finalistas! 🌼',
+    duelTitle: '🕯️ ¿Quién llega primero al altar?',
+    duelGoal: '🕯️',
+    duelWin: (n) => `🌼 ¡${n} GANA! 🌼`,
   },
 };
 

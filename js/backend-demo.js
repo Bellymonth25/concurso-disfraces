@@ -10,7 +10,7 @@ const channel = 'BroadcastChannel' in window ? new BroadcastChannel(KEY) : null;
 
 function blank() {
   return {
-    game: { phase: 'setup', cuts: [25, 10, 5, 1], votesPlan: [3, 2, 2, 1], currentRoundId: null, winnerIds: [], theme: 'clasico', showcase: false, spotlightId: null },
+    game: { phase: 'setup', cuts: [20, 6, 3], votesPlan: [3, 2, 1], currentRoundId: null, winnerIds: [], theme: 'clasico', showcase: false, spotlightId: null, finalStep: 0 },
     contestants: [],
     codes: {},        // contestantId -> code
     rounds: [],
@@ -154,7 +154,7 @@ export function createDemoBackend() {
     async updateRound(id, patch) { mutate((db) => Object.assign(db.rounds.find((r) => r.id === id), patch)); },
     async resetGame() {
       mutate((db) => {
-        Object.assign(db.game, { phase: 'setup', currentRoundId: null, winnerIds: [], showcase: false, spotlightId: null });
+        Object.assign(db.game, { phase: 'setup', currentRoundId: null, winnerIds: [], showcase: false, spotlightId: null, finalStep: 0 });
         db.rounds = [];
         db.votes = [];
       });
